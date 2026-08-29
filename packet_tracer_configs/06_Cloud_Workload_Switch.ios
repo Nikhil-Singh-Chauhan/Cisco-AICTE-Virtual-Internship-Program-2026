@@ -1,0 +1,66 @@
+! ==============================================================================
+! CISCO VIRTUAL INTERNSHIP 2026 - CYBER SECURITY PROJECT
+! Component: Public Cloud VPC Workload Layer 2 Switch
+! Device: Cisco Catalyst 2960 Switch
+! Hostname: CLOUD-VPC-SW-01
+! Description: Cloud VPC Subnet Segmentation (Ingress, Microservices, DB)
+! ==============================================================================
+
+enable
+configure terminal
+
+hostname CLOUD-VPC-SW-01
+no ip domain-lookup
+service password-encryption
+enable secret Cisco@NetAcad2026!Secure
+
+username admin privilege 15 secret Admin@NetAcad2026!P@ss
+crypto key generate rsa modulus 2048
+ip ssh version 2
+
+! --- Cloud VPC Subnet VLANs ---
+vlan 10
+ name CLOUD_INGRESS_ALB
+vlan 20
+ name CLOUD_EKS_WORKERS
+vlan 30
+ name CLOUD_DATABASE_TIER
+
+! --- Uplink Trunk to Cloud Gateway Router ---
+interface GigabitEthernet0/1
+ description TRUNK-TO-CLOUD-GATEWAY-RTR
+ switchport mode trunk
+ switchport trunk allowed vlan 10,20,30
+ no shutdown
+
+! --- Port Assignments for Simulated Cloud Instances ---
+! Ingress Public Load Balancer (VLAN 10)
+interface FastEthernet0/1
+ description CLOUD-ALB-INGRESS-PROXY
+ switchport mode access
+ switchport access vlan 10
+ spanning-tree portfast
+ no shutdown
+
+! Kubernetes Microservice Node 1 (VLAN 20)
+interface FastEthernet0/2
+ description EKS-MICROSERVICE-CONTAINER-01
+ switchport mode access
+ switchport access vlan 20
+ spanning-tree portfast
+ no shutdown
+
+! Cloud Managed Database Instance (VLAN 30)
+interface FastEthernet0/3
+ description CLOUD-AURORA-DATABASE-INSTANCE
+ switchport mode access
+ switchport access vlan 30
+ spanning-tree portfast
+ no shutdown
+
+! Unused Ports Shutdown
+interface range FastEthernet0/4 - 24, GigabitEthernet0/2
+ shutdown
+
+end
+write memory

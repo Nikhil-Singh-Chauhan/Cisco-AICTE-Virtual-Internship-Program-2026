@@ -1,0 +1,72 @@
+# ==============================================================================
+# CISCO VIRTUAL INTERNSHIP 2026 - CYBER SECURITY PROJECT
+# Kubernetes / OpenShift Security Manifest
+# Component: Pod Security Standards (PSS) & Hardened Workload Deployment
+# Profile: Restricted (Non-root, read-only rootfs, drop ALL capabilities, seccomp)
+# ==============================================================================
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: production
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/warn: restricted
+    istio-injection: enabled
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: academic-backend-api
+  namespace: production
+  labels:
+    app: academic-backend-api
+    tier: application
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: academic-backend-api
+  template:
+    metadata:
+      labels:
+        app: academic-backend-api
+        tier: application
+    spec:
+      serviceAccountName: academic-microservice-sa
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+      - name: api-server
+        image: enterprise.azurecr.io/academic-api:v2.4.1
+        imagePullPolicy: IfNotPresent
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        ports:
+        - containerPort: 8080
+          name: http-api
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "512Mi"
+          requests:
+            cpu: "100m"
+            memory: "128Mi"
+        volumeMounts:
+        - name: tmp-volume
+          mountPath: /tmp
+      volumes:
+      - name: tmp-volume
+        emptyDir: {}

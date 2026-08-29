@@ -1,0 +1,115 @@
+# ==============================================================================
+# CISCO VIRTUAL INTERNSHIP 2026 - CYBER SECURITY PROJECT
+# Kubernetes / OpenShift Security Manifest
+# Component: Microservice Tier Segmentation NetworkPolicy
+# Description: Fine-grained ingress/egress rules for Academic Microservices,
+#              Database connectivity, DNS egress, and On-Premises Hybrid Calls.
+# ==============================================================================
+
+---
+# 1. Frontend Web Service NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-frontend-traffic
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: academic-frontend
+      tier: web
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow traffic only from Ingress Controller (e.g., AWS ALB / Traefik / Nginx Ingress)
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: ingress-nginx
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: ingress-nginx
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 443
+  egress:
+  # Allow egress ONLY to Backend Microservice on port 8080
+  - to:
+    - podSelector:
+        matchLabels:
+          app: academic-backend-api
+          tier: application
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow CoreDNS resolution
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53
+
+---
+# 2. Backend API Microservice NetworkPolicy
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-backend-api-traffic
+  namespace: production
+spec:
+  podSelector:
+    matchLabels:
+      app: academic-backend-api
+      tier: application
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  # Allow ingress strictly from Frontend pods
+  - from:
+    - podSelector:
+        matchLabels:
+          app: academic-frontend
+          tier: web
+    ports:
+    - protocol: TCP
+      port: 8080
+  # Allow hybrid API calls from On-Premises OpenShift Cluster (10.10.30.0/24)
+  - from:
+    - ipBlock:
+        cidr: 10.10.30.0/24
+    ports:
+    - protocol: TCP
+      port: 8080
+  egress:
+  # Allow egress to Cloud Database (RDS / Aurora) in isolated subnet
+  - to:
+    - ipBlock:
+        cidr: 172.20.3.0/24
+    ports:
+    - protocol: TCP
+      port: 5432
+  # Allow egress to On-Premises Data Center Database (10.10.30.50) over Hybrid IPsec Tunnel
+  - to:
+    - ipBlock:
+        cidr: 10.10.30.50/32
+    ports:
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 1521
+  # Allow CoreDNS
+  - to:
+    - namespaceSelector: {}
+      podSelector:
+        matchLabels:
+          k8s-app: kube-dns
+    ports:
+    - protocol: UDP
+      port: 53

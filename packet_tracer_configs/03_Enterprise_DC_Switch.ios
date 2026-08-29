@@ -1,0 +1,138 @@
+! ==============================================================================
+! CISCO VIRTUAL INTERNSHIP 2026 - CYBER SECURITY PROJECT
+! Component: Enterprise Campus & Data Center Distribution/Access Switch
+! Device: Cisco Catalyst 2960 / 3650 Switch
+! Hostname: ENT-DC-SW-01
+! Description: Layer 2 Hardening, VLANs, 802.1Q Trunks, Port Security,
+!              DHCP Snooping, DAI, and BPDU Guard
+! ==============================================================================
+
+enable
+configure terminal
+
+! --- Basic Hardening ---
+hostname ENT-DC-SW-01
+no ip domain-lookup
+ip domain-name enterprise.netacad.internal
+service password-encryption
+enable secret Cisco@NetAcad2026!Secure
+
+banner motd ^C
+================================================================================
+  ENTERPRISE L2 SWITCH - AUTHORIZED ACCESS ONLY.
+  PORT SECURITY & DHCP SNOOPING ACTIVELY ENFORCED ON THIS DEVICE.
+================================================================================
+^C
+
+! Secure Management
+username admin privilege 15 secret Admin@NetAcad2026!P@ss
+crypto key generate rsa modulus 2048
+ip ssh version 2
+
+line con 0
+ exec-timeout 10 0
+ logging synchronous
+ login local
+
+line vty 0 15
+ exec-timeout 10 0
+ logging synchronous
+ login local
+ transport input ssh
+
+! --- VLAN Creation ---
+vlan 10
+ name FACULTY_WORKSTATIONS
+vlan 20
+ name STAFF_STUDENT_LAN
+vlan 30
+ name DC_OPENSHIFT_SERVERS
+vlan 99
+ name NETWORK_MANAGEMENT
+vlan 666
+ name NATIVE_BLACKHOLE
+
+! --- SVI for Switch Management ---
+interface Vlan99
+ description MANAGEMENT-SVI
+ ip address 10.10.99.2 255.255.255.0
+ no shutdown
+
+ip default-gateway 10.10.99.1
+
+! --- Uplink to Core Router (802.1Q Trunk) ---
+interface GigabitEthernet0/1
+ description TRUNK-TO-ENT-CORE-ROUTER
+ switchport trunk encapsulation dot1q
+ switchport mode trunk
+ switchport trunk native vlan 666
+ switchport trunk allowed vlan 10,20,30,99
+ switchport nonegotiate
+ no shutdown
+
+! --- Layer 2 Security: DHCP Snooping ---
+ip dhcp snooping
+ip dhcp snooping vlan 10,20
+no ip dhcp snooping information option
+
+! Trust uplink to router
+interface GigabitEthernet0/1
+ ip dhcp snooping trust
+
+! --- Layer 2 Security: Dynamic ARP Inspection (DAI) ---
+ip arp inspection vlan 10,20
+
+interface GigabitEthernet0/1
+ ip arp inspection trust
+
+! --- Access Ports: Faculty Workstations (VLAN 10) ---
+interface range FastEthernet0/1 - 5
+ description FACULTY-ACCESS-PORTS
+ switchport mode access
+ switchport access vlan 10
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security violation shutdown
+ switchport port-security mac-address sticky
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+ no shutdown
+
+! --- Access Ports: Staff / Student Workstations (VLAN 20) ---
+interface range FastEthernet0/6 - 10
+ description STAFF-STUDENT-PORTS
+ switchport mode access
+ switchport access vlan 20
+ switchport port-security
+ switchport port-security maximum 2
+ switchport port-security violation shutdown
+ switchport port-security mac-address sticky
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+ no shutdown
+
+! --- Access Ports: Data Center & OpenShift Servers (VLAN 30) ---
+interface range FastEthernet0/11 - 20
+ description DC-OPENSHIFT-CONTAINER-HOSTS
+ switchport mode access
+ switchport access vlan 30
+ switchport port-security
+ switchport port-security maximum 5
+ switchport port-security violation restrict
+ spanning-tree portfast
+ spanning-tree bpduguard enable
+ no shutdown
+
+! --- Shutdown Unused Ports & Move to Blackhole VLAN ---
+interface range FastEthernet0/21 - 24, GigabitEthernet0/2
+ description UNUSED-PORTS-PARKED
+ switchport access vlan 666
+ shutdown
+
+! --- Global Spanning-Tree Optimization ---
+spanning-tree mode rapid-pvst
+spanning-tree portfast default
+spanning-tree portfast bpduguard default
+
+end
+write memory

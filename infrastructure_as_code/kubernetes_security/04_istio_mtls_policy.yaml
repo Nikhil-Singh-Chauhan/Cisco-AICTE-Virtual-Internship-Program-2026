@@ -1,0 +1,46 @@
+# ==============================================================================
+# CISCO VIRTUAL INTERNSHIP 2026 - CYBER SECURITY PROJECT
+# Kubernetes / OpenShift Security Manifest
+# Component: Service Mesh Mutual TLS (mTLS) & Granular Authorization
+# Technology: Istio / Cisco Service Mesh Manager
+# ==============================================================================
+
+---
+# 1. Global PeerAuthentication: Enforce STRICT Mutual TLS across the namespace
+apiVersion: security.istio.io/v1beta1
+kind: PeerAuthentication
+metadata:
+  name: default-strict-mtls
+  namespace: production
+spec:
+  mtls:
+    mode: STRICT
+
+---
+# 2. AuthorizationPolicy: Allow only authenticated Frontend Service to call Backend API
+apiVersion: security.istio.io/v1beta1
+kind: AuthorizationPolicy
+metadata:
+  name: backend-api-rbac-policy
+  namespace: production
+spec:
+  selector:
+    matchLabels:
+      app: academic-backend-api
+  action: ALLOW
+  rules:
+  - from:
+    - source:
+        principals: ["cluster.local/ns/production/sa/academic-frontend-sa"]
+    to:
+    - operation:
+        methods: ["GET", "POST"]
+        paths: ["/api/v1/*"]
+  - from:
+    - source:
+        # Allow On-Premises Faculty Identity authenticated via Cisco ISE & Token Exchange
+        requestPrincipals: ["https://auth.enterprise.netacad.internal/*"]
+    to:
+    - operation:
+        methods: ["GET"]
+        paths: ["/api/v1/research/*"]

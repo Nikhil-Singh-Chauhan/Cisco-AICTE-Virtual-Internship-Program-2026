@@ -1,0 +1,63 @@
+! ==============================================================================
+! CISCO VIRTUAL INTERNSHIP 2026 - CYBER SECURITY PROJECT
+! Component: ISP Internet & Public WAN Backbone Router
+! Device: Cisco 2911 Integrated Services Router
+! Hostname: ISP-BACKBONE-RTR
+! Description: Public Internet routing between Enterprise WAN and Cloud Gateway
+! ==============================================================================
+
+enable
+configure terminal
+
+hostname ISP-BACKBONE-RTR
+no ip domain-lookup
+service password-encryption
+enable secret Cisco@NetAcad2026!Secure
+
+banner motd ^C
+================================================================================
+  PUBLIC INTERNET SERVICE PROVIDER BACKBONE ROUTER
+  TRAFFIC ROUTING ONLY - STRICT MONITORING ACTIVE
+================================================================================
+^C
+
+! Interface 0/0: Uplink to Enterprise Perimeter ASA (203.0.113.0/30)
+interface GigabitEthernet0/0
+ description WAN-LINK-TO-ENTERPRISE-ASA
+ ip address 203.0.113.1 255.255.255.252
+ no shutdown
+
+! Interface 0/1: Uplink to Cloud Transit Gateway Router (198.51.100.0/30)
+interface GigabitEthernet0/1
+ description WAN-LINK-TO-CLOUD-TRANSIT-GW
+ ip address 198.51.100.1 255.255.255.252
+ no shutdown
+
+! Interface 0/2: Public Internet Web & DNS Server Network (209.165.200.0/24)
+interface GigabitEthernet0/2
+ description PUBLIC-INTERNET-SERVICES-LAN
+ ip address 209.165.200.1 255.255.255.0
+ no shutdown
+
+! Loopback for Public DNS Server Emulation
+interface Loopback0
+ description PUBLIC-ROOT-DNS
+ ip address 8.8.8.8 255.255.255.255
+
+! Enable IP Routing
+ip routing
+
+line con 0
+ exec-timeout 10 0
+ logging synchronous
+ password cisco
+ login
+
+line vty 0 4
+ exec-timeout 10 0
+ logging synchronous
+ password cisco
+ login
+
+end
+write memory
